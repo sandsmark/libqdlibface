@@ -5,7 +5,8 @@ find_package(dlib REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Core Gui)
 
 set(sources
-    Descriptor.cpp
+    Face.cpp
+    Database.cpp
     )
 
 add_library(libqdlibface ${sources})

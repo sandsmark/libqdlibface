@@ -1,4 +1,4 @@
-#include "Descriptor.h"
+#include "Face.h"
 
 #include <QStandardPaths>
 #include <QImage>
@@ -68,14 +68,14 @@ struct Data {
     {
         const QString netPath = QStandardPaths::locate(
                 QStandardPaths::AppDataLocation,
-                Descriptor::netFileName
+                Face::netFileName
             );
 
         if (netPath.isEmpty()) {
-            qWarning() << "Failed to locate" << Descriptor::netFileName;
+            qWarning() << "Failed to locate" << Face::netFileName;
 
             qDebug() << "It can be downloaded from"
-                << Descriptor::netUrl
+                << Face::netUrl
                 << "and decompressed into "
                 << QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
 
@@ -85,13 +85,13 @@ struct Data {
 
         const QString shapePredictorPath = QStandardPaths::locate(
                 QStandardPaths::AppDataLocation,
-                Descriptor::shapePredictorFileName
+                Face::shapePredictorFileName
             );
 
         if (shapePredictorPath.isEmpty()) {
-            qWarning() << "Failed to locate" << Descriptor::shapePredictorFileName;
+            qWarning() << "Failed to locate" << Face::shapePredictorFileName;
             qDebug() << "It can be downloaded from"
-                << Descriptor::shapePredictorUrl
+                << Face::shapePredictorUrl
                 << "and decompressed into "
                 << QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
             qDebug() << "Or just complain to whomever supplied your application";
@@ -117,13 +117,13 @@ struct Data {
 };
 }
 
-bool Descriptor::loadData()
+bool Face::loadData()
 {
     Data &data = Data::instance();
     return data.isValid;
 }
 
-QVector<Descriptor> Descriptor::findFaces(const QImage &qimage)
+QVector<Face> Face::findFaces(const QImage &qimage)
 {
     Data &data = Data::instance();
     if (!data.isValid) {
@@ -172,9 +172,9 @@ QVector<Descriptor> Descriptor::findFaces(const QImage &qimage)
     std::vector<dlib::matrix<float,0,1>> descriptors = data.metricNet(faces);
     assert(descriptors.size() == size_t(rects.size()));
 
-    QVector<Descriptor> ret(descriptors.size());
+    QVector<Face> ret(descriptors.size());
     for (size_t i=0; i<descriptors.size(); i++) {
-        ret[i] = descriptors[i];
+        ret[i].descriptor = descriptors[i];
         ret[i].rectangle = rects[i];
     }
 
