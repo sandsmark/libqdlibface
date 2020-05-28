@@ -62,10 +62,49 @@ using net_type = loss_metric<fc_no_bias<128,avg_pool_everything<
                             >>>>>>>>>>>>;
 
 struct Data {
+
     Data() :
         detector(dlib::get_frontal_face_detector())
     {
+        const QString netPath = QStandardPaths::locate(
+                QStandardPaths::AppDataLocation,
+                Descriptor::netFileName
+            );
+
+        if (netPath.isEmpty()) {
+            qWarning() << "Failed to locate" << Descriptor::netFileName;
+
+            qDebug() << "It can be downloaded from"
+                << Descriptor::netUrl
+                << "and decompressed into "
+                << QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+
+            qDebug() << "Or just complain to whomever supplied your application";
+            return;
+        }
+
+        const QString shapePredictorPath = QStandardPaths::locate(
+                QStandardPaths::AppDataLocation,
+                Descriptor::shapePredictorFileName
+            );
+
+        if (shapePredictorPath.isEmpty()) {
+            qWarning() << "Failed to locate" << Descriptor::shapePredictorFileName;
+            qDebug() << "It can be downloaded from"
+                << Descriptor::shapePredictorUrl
+                << "and decompressed into "
+                << QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+            qDebug() << "Or just complain to whomever supplied your application";
+            return;
+        }
+
+        dlib::deserialize(shapePredictorPath.toStdString()) >> shapePredictor;
+        dlib::deserialize(netPath.toStdString()) >> metricNet;
+
+        isValid = true;
     }
+
+    bool isValid = false;
 
     dlib::frontal_face_detector detector;
     dlib::shape_predictor shapePredictor;
@@ -78,8 +117,20 @@ struct Data {
 };
 }
 
+bool Descriptor::loadData()
+{
+    Data &data = Data::instance();
+    return data.isValid;
+}
+
 QVector<Descriptor> Descriptor::findFaces(const QImage &qimage)
 {
+    Data &data = Data::instance();
+    if (!data.isValid) {
+        qWarning() << "Data failed to load";
+        return {};
+    }
+
     // QImage is COW, so not horribly inefficient
     const QImage sourceImage = (qimage.format() == QImage::Format_RGB888) ?
         qimage : qimage.convertToFormat(QImage::Format_RGB888);
@@ -102,8 +153,6 @@ QVector<Descriptor> Descriptor::findFaces(const QImage &qimage)
             memcpy(dlibData + bplDlib * y, sourceImage.scanLine(y), bplDlib);
         }
     }
-
-    Data &data = Data::instance();
 
     std::vector<dlib::matrix<dlib::rgb_pixel>> faces;
     QVector<QRect> rects;
