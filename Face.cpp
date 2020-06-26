@@ -123,7 +123,7 @@ bool Face::loadData()
     return data.isValid;
 }
 
-QVector<Face> Face::findFaces(const QImage &qimage)
+QVector<Face> Face::findFaces(const QImage &qimage, const QString &id)
 {
     Data &data = Data::instance();
     if (!data.isValid) {
@@ -176,6 +176,7 @@ QVector<Face> Face::findFaces(const QImage &qimage)
     for (size_t i=0; i<descriptors.size(); i++) {
         ret[i].descriptor = descriptors[i];
         ret[i].rectangle = rects[i];
+        ret[i].imageId = id;
     }
 
     return ret;

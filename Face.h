@@ -24,8 +24,14 @@ struct Face
     /// Rectangle in the image where it is
     QRect rectangle;
 
+    QString imageId;
+
+    QString name;
+
     static bool loadData();
 
-    static QVector<Face> findFaces(const QImage &image);
+    /// Returns a list of faces, the id should be a unique ID for the source
+    /// image (e. g. file path)
+    static QVector<Face> findFaces(const QImage &image, const QString &id);
 };
 

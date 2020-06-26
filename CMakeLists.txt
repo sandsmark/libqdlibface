@@ -3,6 +3,7 @@ project(libqdlibface LANGUAGES CXX VERSION 1.0)
 
 find_package(dlib REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Core Gui)
+find_package(Threads REQUIRED)
 
 set(sources
     Face.cpp

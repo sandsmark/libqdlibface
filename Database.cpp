@@ -3,6 +3,8 @@
 
 #include <QDebug>
 
+#include <dlib/clustering/chinese_whispers.h>
+
 QString Database::findFast(const Face &face, double *score)
 {
     if (m_centroidsOutdated) {
@@ -89,14 +91,14 @@ QString Database::findSlow(const Face &face, double *score)
 
 bool Database::save(const QString &path)
 {
-    dlib::serialize(path.toStdString()) << m_allDescriptors << m_allNames;
+    dlib::serialize(path.toStdString()) << m_allDescriptors << m_allNames << m_allImageIds;
     dlib::serialize(path.toStdString() + ".centroids") << m_centroids << m_centroidNames;
     return true;//todo
 }
 
 bool Database::load(const QString &path)
 {
-    dlib::deserialize(path.toStdString()) >> m_allDescriptors >> m_allNames;
+    dlib::deserialize(path.toStdString()) >> m_allDescriptors >> m_allNames >> m_allImageIds;
     dlib::deserialize(path.toStdString() + ".centroids") >> m_centroids >> m_centroidNames;
 
     m_centroidsOutdated = false;
@@ -104,7 +106,33 @@ bool Database::load(const QString &path)
     return true;//todo
 }
 
-void Database::addFace(const QString &qname, const Face &face)
+void Database::groupUnknownFaces(QVector<Face> *faces)
+{
+    std::vector<dlib::sample_pair> connections;
+    for (int i = 0; i < faces->size(); ++i) {
+        for (int j = i; j < faces->size(); ++j) {
+            // The network is trained on 0.6, but 0.5 seems to give better results overall.
+            // Misses some faces, though, but I think this is better for our usage
+            if (length((*faces)[i].descriptor - (*faces)[j].descriptor) < 0.5) {
+                connections.push_back(dlib::sample_pair(i,j));
+            }
+        }
+    }
+
+    std::vector<uint64_t> clusterIds;
+    const uint64_t clustersCount = dlib::chinese_whispers(connections, clusterIds);
+
+    for (size_t cluster = 0; cluster < clustersCount; ++cluster) {
+        const QString name = QObject::tr("Unknown %1").arg(cluster);
+        for (size_t j = 0; j < clusterIds.size(); ++j) {
+            if (cluster == clusterIds[j]) {
+                (*faces)[j].name = name;
+            }
+        }
+    }
+}
+
+void Database::addFace(const Face &face, const QString &qname)
 {
     const std::string name = qname.toStdString();
     int insertPos = m_allNames.size();
@@ -117,6 +145,7 @@ void Database::addFace(const QString &qname, const Face &face)
     }
 
     m_allDescriptors[insertPos].push_back(face.descriptor);
+    m_allImageIds[insertPos].push_back(face.imageId.toStdString());
 
     m_centroidsOutdated = true;
 }

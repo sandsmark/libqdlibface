@@ -11,7 +11,7 @@ struct Face;
 class Database
 {
 public:
-    void addFace(const QString &name, const Face &face);
+    void addFace(const Face &face, const QString &name = QString());
 
     // Is a bit faster, but uses centroids that approximate matching
     QString findFast(const Face &face, double *score = nullptr);
@@ -25,6 +25,10 @@ public:
     /// Updates the centroids
     void updateCache();
 
+    /// Automatically tries to group similar faces (by clustering) and assigns
+    /// "Unknown #" names to all faces passed
+    static void groupUnknownFaces(QVector<Face> *faces);
+
 private:
     using kernel_type = dlib::radial_basis_kernel<dlib::matrix<float,128,1>>;
     std::vector<dlib::kcentroid<kernel_type>> m_centroids;
@@ -33,6 +37,9 @@ private:
 
     std::vector<std::vector<dlib::matrix<float,128,1>>> m_allDescriptors;
     std::vector<std::string> m_allNames;
+    std::vector<std::vector<std::string>> m_allImageIds;
+
+    std::vector<Face> m_unknownFaces;
 
     bool m_centroidsOutdated = true;
 };
