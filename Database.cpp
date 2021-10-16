@@ -91,19 +91,31 @@ QString Database::findSlow(const Face &face, double *score)
 
 bool Database::save(const QString &path)
 {
-    dlib::serialize(path.toStdString()) << m_allDescriptors << m_allNames << m_allImageIds;
-    dlib::serialize(path.toStdString() + ".centroids") << m_centroids << m_centroidNames;
-    return true;//todo
+    try {
+        dlib::serialize(path.toStdString())
+            << m_allDescriptors << m_allNames
+            << m_centroids << m_centroidNames
+            << m_allImageIds;
+    } catch (const std::exception &e) {
+        qWarning() << e.what();
+        return false;
+    }
+    return true;
 }
 
 bool Database::load(const QString &path)
 {
-    dlib::deserialize(path.toStdString()) >> m_allDescriptors >> m_allNames >> m_allImageIds;
-    dlib::deserialize(path.toStdString() + ".centroids") >> m_centroids >> m_centroidNames;
-
-    m_centroidsOutdated = false;
-
-    return true;//todo
+    try {
+        dlib::deserialize(path.toStdString())
+            >> m_allDescriptors >> m_allNames
+            >> m_centroids >> m_centroidNames
+            >> m_allImageIds;
+        m_centroidsOutdated = false;
+    } catch (const std::exception &e) {
+        qWarning() << e.what();
+        return false;
+    }
+    return true;
 }
 
 void Database::groupUnknownFaces(QVector<Face> *faces)
