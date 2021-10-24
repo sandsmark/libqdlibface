@@ -1,9 +1,34 @@
 #include "Database.h"
 #include "Face.h"
 
+#include "Util.h"
+
 #include <QDebug>
 
 #include <dlib/clustering/chinese_whispers.h>
+#include <dlib/serialize.h>
+
+void serialize (const Face& item, std::ostream& out)
+{
+    dlib::serialize(qrectToDlib(item.rectangle), out);
+    dlib::serialize(item.imageId.toStdString(), out);
+    dlib::serialize(item.name.toStdString(), out);
+}
+
+void deserialize (Face & item, std::istream& in)
+{
+    dlib::rectangle rect;
+    std::string imageId;
+    std::string name;
+
+    dlib::deserialize(rect, in);
+    dlib::deserialize(imageId, in);
+    dlib::deserialize(name, in);
+
+    item.rectangle = dlibRectToQRect(rect);
+    item.imageId = QString::fromStdString(imageId);
+    item.name = QString::fromStdString(name);
+}
 
 QString Database::findFast(const Face &face, double *score)
 {
@@ -44,11 +69,11 @@ QString Database::findSlow(const Face &face, double *score)
     double bestScore = std::numeric_limits<double>::max();
     std::string bestName;
 
-    for (size_t i=0; i<m_allDescriptors.size(); i++) {
+    for (size_t i=0; i<m_allNames.size(); i++) {
         std::vector<double> scores;
-        std::transform(m_allDescriptors[i].begin(), m_allDescriptors[i].end(), std::back_inserter(scores),
-            [&](const dlib::matrix<float,128,1> &sample) {
-                return dlib::length(face.descriptor - sample);
+        std::transform(m_allFaces[i].begin(), m_allFaces[i].end(), std::back_inserter(scores),
+            [&](const Face &sample) {
+                return dlib::length(face.descriptor - sample.descriptor);
             }
         );
         if (scores.empty()) {
@@ -93,9 +118,8 @@ bool Database::save(const QString &path)
 {
     try {
         dlib::serialize(path.toStdString())
-            << m_allDescriptors << m_allNames
-            << m_centroids << m_centroidNames
-            << m_allImageIds;
+            << m_allFaces << m_unknownFaces
+            << m_centroids << m_centroidNames;
     } catch (const std::exception &e) {
         qWarning() << e.what();
         return false;
@@ -107,15 +131,62 @@ bool Database::load(const QString &path)
 {
     try {
         dlib::deserialize(path.toStdString())
-            >> m_allDescriptors >> m_allNames
-            >> m_centroids >> m_centroidNames
-            >> m_allImageIds;
+            >> m_allFaces >> m_unknownFaces
+            >> m_centroids >> m_centroidNames;
         m_centroidsOutdated = false;
     } catch (const std::exception &e) {
         qWarning() << e.what();
         return false;
     }
     return true;
+}
+
+QStringList Database::allNames() const
+{
+    QStringList ret;
+    for (const std::string &name : m_allNames) {
+        ret.append(QString::fromStdString(name));
+    }
+    return ret;
+}
+
+void Database::deleteAll(const QString &qname)
+{
+    assert(m_allFaces.size() == m_allNames.size());
+
+    const std::string name = qname.toStdString();
+    std::vector<std::string>::iterator it = std::find(m_allNames.begin(), m_allNames.end(), name);
+    if (it == m_allNames.end()) {
+        return;
+    }
+
+    int erasePos = std::distance(m_allNames.begin(), it);
+    qDebug() << "Erasing" << qname << QString::fromStdString(*it) << (*(m_allFaces.begin() + erasePos))[0].name;
+    m_allNames.erase(it);
+    m_allFaces.erase(m_allFaces.begin() + erasePos);
+
+    m_centroidsOutdated = true;
+}
+
+void Database::rename(const QString &oldName, const QString &newName)
+{
+    const std::string name = oldName.toStdString();
+    std::vector<std::string>::iterator it = std::find(m_allNames.begin(), m_allNames.end(), name);
+    if (it == m_allNames.end()) {
+        return;
+    }
+
+    int renamePos = std::distance(m_allNames.begin(), it);
+    qDebug() << "Renaming" << oldName << QString::fromStdString(*it) << (*(m_allFaces.begin() + renamePos))[0].name;
+
+    *it = name;
+    for (Face &face : m_allFaces[renamePos]) {
+        face.name = newName;
+    }
+
+    m_centroids.clear();
+    m_centroidNames.clear();
+    updateCache();
 }
 
 void Database::groupUnknownFaces(QVector<Face> *faces)
@@ -152,31 +223,35 @@ void Database::addFace(const Face &face, const QString &qname)
     std::vector<std::string>::iterator it = std::find(m_allNames.begin(), m_allNames.end(), name);
     if (it == m_allNames.end()) {
         m_allNames.push_back(name);
+        insertPos--;
     } else {
         insertPos = std::distance(m_allNames.begin(), it);
     }
 
-    m_allDescriptors[insertPos].push_back(face.descriptor);
-    m_allImageIds[insertPos].push_back(face.imageId.toStdString());
+    m_allFaces[insertPos].push_back(face);
 
     m_centroidsOutdated = true;
 }
 
 void Database::updateCache()
 {
+    assert(m_allFaces.size() == m_allNames.size());
     m_normalizer = dlib::vector_normalizer<dlib::matrix<float,128,1>>();
-    for (const std::vector<dlib::matrix<float,128,1>> &descriptors : m_allDescriptors) {
-        m_normalizer.train(descriptors);
+    std::vector<dlib::matrix<float,128,1>> descriptors;
+    for (const std::vector<Face> &faces : m_allFaces) {
+        for (const Face &face : faces) {
+            descriptors.push_back(face.descriptor);
+        }
     }
-    assert(m_allDescriptors.size() == m_allNames.size());
+    m_normalizer.train(descriptors);
 
     m_centroids.clear();
     m_centroidNames.clear();
 
-    for (size_t i=0; i<m_allDescriptors.size(); i++) {
+    for (size_t i=0; i<m_allFaces.size(); i++) {
         dlib::kcentroid<kernel_type> centroid(kernel_type(0.001), 0.000001, 15);
-        for (const dlib::matrix<float,128,1> &descriptor : m_allDescriptors[i]) {
-            centroid.train(descriptor);
+        for (const Face &face : m_allFaces[i]) {
+            centroid.train(face.descriptor);
         }
         m_centroids.push_back(std::move(centroid));
         m_centroidNames.push_back(m_allNames[i]);

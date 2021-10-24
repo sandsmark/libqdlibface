@@ -1,5 +1,7 @@
 #include "Face.h"
 
+#include "Util.h"
+
 #include <QStandardPaths>
 #include <QImage>
 #include <QDebug>
@@ -160,7 +162,7 @@ QVector<Face> Face::findFaces(const QImage &qimage, const QString &id)
     static const int chipSize = 150;
     static const float padding = 0.25;
     for (const dlib::rectangle &faceRect : data.detector(image)) {
-        rects.append(QRect(faceRect.left(), faceRect.top(), faceRect.width(), faceRect.height()));
+        rects.append(dlibRectToQRect(faceRect));
 
         const dlib::full_object_detection shape = data.shapePredictor(image, faceRect);
         dlib::matrix<dlib::rgb_pixel> face;

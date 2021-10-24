@@ -21,6 +21,7 @@ configure_file(QDLibFaceConfig.cmake.in
 
 add_library(libqdlibface ${sources})
 target_link_libraries(libqdlibface PUBLIC Qt5::Gui Qt5::Core dlib::dlib)
+set(HAVE_KFACE True)
 
 include(GNUInstallDirs)
 set_target_properties(libqdlibface PROPERTIES

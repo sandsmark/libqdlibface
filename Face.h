@@ -23,9 +23,7 @@ struct Face
 
     /// Rectangle in the image where it is
     QRect rectangle;
-
     QString imageId;
-
     QString name;
 
     static bool loadData();

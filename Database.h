@@ -29,15 +29,20 @@ public:
     /// "Unknown #" names to all faces passed
     static void groupUnknownFaces(QVector<Face> *faces);
 
+    void rename(const QString &oldName, const QString &newName);
+    void deleteAll(const QString &name);
+    QStringList allNames() const;
+
+    QVector<Face> facesForName(const QString &name) const;
+
 private:
     using kernel_type = dlib::radial_basis_kernel<dlib::matrix<float,128,1>>;
     std::vector<dlib::kcentroid<kernel_type>> m_centroids;
     dlib::vector_normalizer<dlib::matrix<float,128,1>> m_normalizer;
     std::vector<std::string> m_centroidNames;
 
-    std::vector<std::vector<dlib::matrix<float,128,1>>> m_allDescriptors;
+    std::vector<std::vector<Face>> m_allFaces;
     std::vector<std::string> m_allNames;
-    std::vector<std::vector<std::string>> m_allImageIds;
 
     std::vector<Face> m_unknownFaces;
 
