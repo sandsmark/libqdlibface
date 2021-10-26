@@ -150,6 +150,15 @@ QStringList Database::allNames() const
     return ret;
 }
 
+int Database::numberOfFaces()
+{
+    int ret = 0;
+    for (const std::vector<Face> &faces : m_allFaces) {
+        ret += faces.size();
+    }
+    return ret;
+}
+
 void Database::deleteAll(const QString &qname)
 {
     assert(m_allFaces.size() == m_allNames.size());

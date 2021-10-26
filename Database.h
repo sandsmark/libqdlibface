@@ -35,6 +35,8 @@ public:
 
     QVector<Face> facesForName(const QString &name) const;
 
+    int numberOfFaces() const;
+
 private:
     using kernel_type = dlib::radial_basis_kernel<dlib::matrix<float,128,1>>;
     std::vector<dlib::kcentroid<kernel_type>> m_centroids;
